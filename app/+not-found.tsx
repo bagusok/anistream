@@ -1,32 +1,34 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
-
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import SafeAreaWrapper from "@/components/SafeAreaWrapper";
+import { Button, CustomText } from "@/components/ui";
+import { router } from "expo-router";
+import { StyleSheet, View } from "react-native";
 
 export default function NotFoundScreen() {
   return (
-    <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
-      <ThemedView style={styles.container}>
-        <ThemedText type="title">This screen doesn't exist.</ThemedText>
-        <Link href="/" style={styles.link}>
-          <ThemedText type="link">Go to home screen!</ThemedText>
-        </Link>
-      </ThemedView>
-    </>
+    <SafeAreaWrapper>
+      <View
+        style={{
+          alignItems: "center",
+        }}
+      >
+        <CustomText
+          size="24"
+          fontStyle="bold"
+          style={{
+            marginTop: 100,
+          }}
+        >
+          404
+        </CustomText>
+        <CustomText size="16">Page not found</CustomText>
+        <Button
+          title="Go back to home"
+          style={{ marginTop: 10 }}
+          onPress={() => {
+            router.push("/(home)/");
+          }}
+        />
+      </View>
+    </SafeAreaWrapper>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
-  },
-});
