@@ -15,7 +15,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-// import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 
 SplashScreen.preventAutoHideAsync();
 ScreenOrientation.unlockAsync();
@@ -23,10 +23,10 @@ ScreenOrientation.unlockAsync();
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
-  // GoogleSignin.configure({
-  //   scopes: ["https://www.googleapis.com/auth/drive.readonly"],
-  //   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-  // });
+  GoogleSignin.configure({
+    // scopes: ["https://www.googleapis.com/auth/drive.readonly"],
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
 
   const [loaded, error] = useFonts({
     Poppins_400Regular,

@@ -1,10 +1,10 @@
 import { atomWithStorage, createJSONStorage } from "jotai/utils";
 import * as SecureStore from "expo-secure-store";
 
-const secureStore = createJSONStorage<string>(() => ({
+const secureStore = createJSONStorage<string | null>(() => ({
   getItem: async (key: string) => {
     const value = await SecureStore.getItemAsync(key);
-    return value;
+    return value !== null ? value : "";
   },
   setItem: async (key: string, value: string) => {
     await SecureStore.setItemAsync(key, value);
@@ -14,4 +14,8 @@ const secureStore = createJSONStorage<string>(() => ({
   },
 }));
 
-export const tokenAtom = atomWithStorage("token", "", secureStore);
+export const tokenAtom = atomWithStorage<string | null>(
+  "token",
+  null,
+  secureStore
+);
