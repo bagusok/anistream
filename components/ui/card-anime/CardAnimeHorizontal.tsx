@@ -25,7 +25,7 @@ export default function CardAnimeHorizontal({ anime }: { anime: any }) {
             source={{ uri: anime.imageUrl }}
             style={styles.animeCardImage}
             contentFit="cover"
-            onLoad={() => console.log("loaded")}
+            // onLoad={() => console.log("loaded")}
           />
           <View
             style={{

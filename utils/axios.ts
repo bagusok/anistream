@@ -11,23 +11,29 @@ axiosIn.interceptors.response.use(
   (response) => {
     if (typeof response.data === "string") {
       try {
-        // Mencoba mendekripsi respons
         const decryptedData = decrypt(response.data);
-        // response.data = JSON.parse(decryptedData);
         let data = JSON.parse(decryptedData);
-        if (typeof data === "string") {
-          data = JSON.parse(data);
-        }
 
         response.data = data;
       } catch (error) {
         response.data = {};
+
         console.error("Error decrypting response:", error);
       }
     }
     return response;
   },
   (error) => {
+    if (error.response && typeof error.response.data === "string") {
+      try {
+        const decryptedData = decrypt(error.response.data);
+        let data = JSON.parse(decryptedData);
+
+        error.response.data = data;
+      } catch (decryptError) {
+        console.error("Error decrypting error response:", decryptError);
+      }
+    }
     return Promise.reject(error);
   }
 );
@@ -61,6 +67,8 @@ function hexStringToUint8Array(hexString: string): Uint8Array {
 const decrypt = (encryptedText: string): string => {
   try {
     const [ivHex, authTagHex, _encryptedBase64] = encryptedText.split(":");
+
+    // console.log(encryptedText);
 
     if (!ivHex || !authTagHex || !_encryptedBase64) {
       throw new Error(

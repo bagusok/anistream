@@ -1,13 +1,24 @@
 import { Tabs } from "expo-router";
 import React from "react";
-
-import { Colors } from "@/constants/Colors";
 import { useColors } from "@/hooks/useColors";
-import { AntDesign, Feather } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
+import { useAtom } from "jotai";
+import { userAtom } from "@/store/auth";
+import LoadingPage from "@/components/LoadingPage";
+import ErrorPage from "@/components/ErrorPage";
 
 export default function TabLayout() {
   const colors = useColors();
 
+  const [user, setUser] = useAtom(userAtom);
+
+  if (user.isLoading) {
+    return <LoadingPage />;
+  }
+
+  if (user.error) {
+    return <ErrorPage message={user?.error?.message} />;
+  }
   return (
     <Tabs
       screenOptions={{
