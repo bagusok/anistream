@@ -1,7 +1,5 @@
 import axios, { AxiosResponse } from "axios";
 import crypto from "react-native-quick-crypto";
-import { Buffer } from "buffer";
-global.Buffer = Buffer;
 
 export const axiosIn = axios.create({
   // headers: {
@@ -34,26 +32,61 @@ axiosIn.interceptors.response.use(
   }
 );
 
-// Menggunakan ENCRYPTION_KEY yang sama seperti di server
-const ENCRYPTION_KEY = Buffer.from(
-  process.env.EXPO_PUBLIC_ENCRYPTION_KEY as string,
-  "hex"
+const ENCRYPTION_KEY = hexStringToUint8Array(
+  process.env.EXPO_PUBLIC_ENCRYPTION_KEY || ""
 );
 const IV_LENGTH = 12; // Panjang IV yang digunakan untuk AES-256-GCM
 
+if (ENCRYPTION_KEY.length !== 32) {
+  throw new Error(
+    "Invalid ENCRYPTION_KEY length. It should be 32 bytes for AES-256-GCM."
+  );
+}
+
+// Fungsi untuk mengonversi string hexadecimal ke Uint8Array
+function hexStringToUint8Array(hexString: string): Uint8Array {
+  if (hexString.length % 2 !== 0) {
+    throw new Error("Hex string length must be even.");
+  }
+
+  const arrayBuffer = new Uint8Array(hexString.length / 2);
+  for (let i = 0; i < hexString.length; i += 2) {
+    arrayBuffer[i / 2] = parseInt(hexString.substring(i, i + 2), 16);
+  }
+
+  return arrayBuffer;
+}
+
 // Fungsi untuk mendekripsi data
 const decrypt = (encryptedText: string): string => {
-  const [ivHex, authTagHex, encryptedBase64] = encryptedText.split(":");
+  try {
+    const [ivHex, authTagHex, _encryptedBase64] = encryptedText.split(":");
 
-  const iv = Buffer.from(ivHex, "hex");
-  const authTag = Buffer.from(authTagHex, "hex");
-  const encryptedTextBuffer = Buffer.from(encryptedBase64, "base64");
+    if (!ivHex || !authTagHex || !_encryptedBase64) {
+      throw new Error(
+        "Invalid input format. Expected format is 'iv:authTag:encryptedText'."
+      );
+    }
 
-  const decipher = crypto.createDecipheriv("aes-256-gcm", ENCRYPTION_KEY, iv);
-  decipher.setAuthTag(authTag);
+    const encryptedBase64 =
+      _encryptedBase64.replace(/-/g, "+").replace(/_/g, "/") +
+      "=".repeat((4 - (_encryptedBase64.length % 4)) % 4);
 
-  let decrypted = decipher.update(encryptedTextBuffer, undefined, "utf8");
-  decrypted += decipher.final("utf8");
+    const iv = hexStringToUint8Array(ivHex);
+    const authTag = hexStringToUint8Array(authTagHex);
+    const encryptedTextBuffer = Uint8Array.from(atob(encryptedBase64), (c) =>
+      c.charCodeAt(0)
+    );
 
-  return decrypted;
+    const decipher = crypto.createDecipheriv("aes-256-gcm", ENCRYPTION_KEY, iv);
+    decipher.setAuthTag(authTag);
+
+    let decrypted = decipher.update(encryptedTextBuffer, undefined, "utf8");
+    decrypted += decipher.final("utf8");
+
+    return decrypted;
+  } catch (error) {
+    console.error("Decryption failed:", error);
+    throw new Error("Failed to decrypt data.");
+  }
 };
