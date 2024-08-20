@@ -106,7 +106,7 @@ export default function AnimeStreamPage() {
       {episodeDetail.data?.stream?.direct?.length > 0 &&
       episodeDetail.data?.stream?.direct[0]?.source?.length > 0 ? (
         <VideoPlayer
-          src={episodeDetail.data.stream.direct[0].source[0].url}
+          episodeId={episodeDetail.data.id}
           title={`${episodeDetail.data.anime?.title} - Episode ${episodeDetail.data.episode}`}
           data={episodeDetail.data.stream.direct}
         />

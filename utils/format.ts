@@ -35,3 +35,15 @@ export const dateFormatAgo = (isoDate: string) => {
     return `${diffInYears} tahun yang lalu`;
   }
 };
+
+export function secondToMinutes(seconds: number): string {
+  // Menghitung menit dan detik
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+
+  // Menambahkan leading zero untuk menit dan detik jika kurang dari 10
+  const minutesString = mins.toString().padStart(2, "0");
+  const secondsString = secs.toString().padStart(2, "0");
+
+  return `${minutesString}:${secondsString}`;
+}

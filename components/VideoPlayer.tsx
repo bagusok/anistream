@@ -1,4 +1,4 @@
-import { ResizeMode, Video } from "expo-av";
+import { AVPlaybackStatus, ResizeMode, Video } from "expo-av";
 import {
   Fragment,
   useCallback,
@@ -35,10 +35,24 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { Image } from "expo-image";
+import { useMutation } from "@tanstack/react-query";
+import { axiosIn } from "@/utils/axios";
+import { API_URL } from "@/constants/Strings";
+import { useAtomValue } from "jotai";
+import { tokenAtom } from "@/store/auth";
 
 const VideoPlayer = memo(
-  ({ src, title, data }: { src: string; title?: string; data: [] }) => {
+  ({
+    episodeId,
+    title,
+    data,
+  }: {
+    episodeId: string;
+    title?: string;
+    data: [];
+  }) => {
     const colors = useColors();
+    const token = useAtomValue(tokenAtom);
 
     const videoRef = useRef<Video>(null);
     const [showVideoControls, setShowVideoControls] = useState(true);
@@ -48,7 +62,7 @@ const VideoPlayer = memo(
 
     const { orientation } = useScreenOrientation();
 
-    const [videoSrc, setVideoSrc] = useState<string>(src);
+    const [videoSrc, setVideoSrc] = useState<string>("");
     const [videoResolution, setVideoResolution] = useState<string>("720p");
 
     const [isPlayed, setIsPlayed] = useState(false);
@@ -65,6 +79,86 @@ const VideoPlayer = memo(
     const [overlaySize, setOverlaySize] = useState({ width: 0, height: 0 });
 
     const dimensions = useWindowDimensions();
+
+    // SYNC VIDEO
+    const lastSyncTime = useRef(0);
+    const isSyncing = useRef(false);
+
+    const syncToServer = useMutation({
+      mutationKey: ["syncToServer"],
+      mutationFn: async ({
+        episodeId,
+        lastTime,
+        videoDuration,
+      }: {
+        episodeId: string;
+        lastTime: number;
+        videoDuration: number;
+      }) =>
+        axiosIn
+          .post(
+            `${API_URL}/anime/user/history/sync`,
+            {
+              episodeId: episodeId,
+              lastTime: lastTime,
+              videoDuration: videoDuration,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          )
+          .then((res) => {
+            console.log(res.data);
+            return res.data;
+          })
+          .catch((err) => {
+            console.log(err);
+            return err;
+          }),
+    });
+
+    const handleSyncOnPlaybackUpdate = (status: AVPlaybackStatus) => {
+      if (!status.isLoaded) return;
+
+      if (status.isPlaying && !isSyncing.current) {
+        syncToServer.mutate({
+          episodeId: episodeId,
+          lastTime: status.positionMillis / 1000,
+          videoDuration: status.durationMillis
+            ? status.durationMillis / 1000
+            : 0,
+        });
+        lastSyncTime.current = Date.now();
+        isSyncing.current = true;
+      } else if (status.isPlaying) {
+        // Throttle subsequent syncs
+        const currentTime = Date.now();
+        if (currentTime - lastSyncTime.current > 10000) {
+          // 10 seconds
+          syncToServer.mutate({
+            episodeId: episodeId,
+            lastTime: status.positionMillis / 1000,
+            videoDuration: status.durationMillis
+              ? status.durationMillis / 1000
+              : 0,
+          });
+          lastSyncTime.current = currentTime;
+        }
+      } else if (!status.isPlaying) {
+        // Stop syncing when video is paused
+        isSyncing.current = false;
+      }
+    };
+
+    useEffect(() => {
+      if (videoRef.current) {
+        videoRef.current.setOnPlaybackStatusUpdate(handleSyncOnPlaybackUpdate);
+      }
+    }, [videoRef.current]);
+
+    // END SYNC VIDEO
 
     useEffect(() => {
       const videoHeight = (videoSize.width / 16) * 9;
