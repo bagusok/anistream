@@ -1,10 +1,11 @@
-import BookmarkButton from "@/components/BookmarkButton";
 import LoadingPage from "@/components/LoadingPage";
 import ParallaxHeader from "@/components/ParallaxHeader";
-import { CustomText } from "@/components/ui";
+import ParallaxScrollView from "@/components/ParallaxScrollView";
+import { Button, CustomText } from "@/components/ui";
 import { ThemeColors } from "@/constants/Colors";
 import { API_URL } from "@/constants/Strings";
 import { useColors } from "@/hooks/useColors";
+
 import { axiosIn } from "@/utils/axios";
 import { dateFormat } from "@/utils/format";
 import { Entypo, Feather } from "@expo/vector-icons";
@@ -12,7 +13,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, router, useLocalSearchParams } from "expo-router";
-
 import {
   Alert,
   Dimensions,
@@ -230,9 +230,9 @@ export default function TestDetailPage() {
                 >
                   {animeDetail.data.title}
                 </CustomText>
-                {animeDetail?.data && (
-                  <BookmarkButton animeId={animeDetail?.data?.id} />
-                )}
+                <Pressable>
+                  <Feather name="bookmark" size={16} color={colors.gray[500]} />
+                </Pressable>
               </View>
               <LinearGradient
                 colors={["transparent", colors.background]}
@@ -310,7 +310,6 @@ export default function TestDetailPage() {
                   flexDirection: "row",
                   justifyContent: "center",
                   gap: 20,
-                  paddingVertical: 10,
                 }}
               >
                 <TouchableOpacity
@@ -348,7 +347,7 @@ export default function TestDetailPage() {
                 fontStyle="regular"
                 style={{ marginTop: 10 }}
               >
-                {animeDetail.data?.synopsis ?? "Tidak ada sinopsis"}
+                {animeDetail.data.synopsis}
               </CustomText>
             </View>
 
@@ -456,7 +455,6 @@ export default function TestDetailPage() {
         scrollEventThrottle={16}
         contentContainerStyle={{
           backgroundColor: colors.background,
-          minHeight: "100%",
         }}
       />
     </SafeAreaView>

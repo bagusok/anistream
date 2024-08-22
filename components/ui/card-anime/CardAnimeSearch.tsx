@@ -42,7 +42,7 @@ export default function CardAnimeSearch({ anime }: { anime: any }) {
             }}
           >
             <CustomText fontStyle="bold" size={11}>
-              Episode {anime.lastEpisode}
+              {anime.lastEpisode} Episode
             </CustomText>
           </View>
           <View
@@ -75,11 +75,9 @@ export default function CardAnimeSearch({ anime }: { anime: any }) {
 const createStyle = (colors: ThemeColors) =>
   StyleSheet.create({
     animeCard: {
-      // backgroundColor: colors.red[500],
       width: "31%",
       margin: "1%",
       marginBottom: 10,
-      marginTop: 20,
       borderRadius: 8,
       position: "relative",
       overflow: "hidden",

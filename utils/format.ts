@@ -1,10 +1,14 @@
 export const dateFormat = (dateIso: Date) => {
-  return new Date(dateIso).toLocaleDateString("id-ID", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  try {
+    return new Date(dateIso).toLocaleDateString("id-ID", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch (error) {
+    return null;
+  }
 };
 
 export const dateFormatAgo = (isoDate: string) => {

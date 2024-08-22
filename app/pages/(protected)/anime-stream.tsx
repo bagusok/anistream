@@ -15,25 +15,71 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useLocalSearchParams } from "expo-router";
 import { useAtomValue } from "jotai";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
+  LayoutChangeEvent,
+  Share,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
-import {
-  ScrollView,
-  TouchableWithoutFeedback,
-} from "react-native-gesture-handler";
+import { ScrollView, TouchableOpacity } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Sharing from "expo-sharing";
+import Animated from "react-native-reanimated";
+import VideoLoading from "@/components/ui/VideoLoading";
+
+interface Episode {
+  id: string;
+  episode: string;
+}
 
 export default function AnimeStreamPage() {
   const { episodeId: id } = useLocalSearchParams();
   const [episodeId, setEpisodeId] = useState(id);
+  const [animeId, setAnimeId] = useState<string>("");
+  const [animeTitle, setAnimeTitle] = useState<string>("");
+
+  const [listEpisode, setListEpisode] = useState<any>([]);
+
   const colors = useColors();
   const styles = createStyles(colors);
+
+  const flatListRef = useRef<Animated.FlatList<Episode>>(null);
+
+  useEffect(() => {
+    if (flatListRef.current) {
+      const activeIndex = listEpisode.findIndex(
+        (item: any) => item.id === episodeId
+      );
+      if (activeIndex !== -1) {
+        flatListRef.current.scrollToIndex({
+          index: activeIndex,
+          animated: true,
+          viewOffset: 0,
+        });
+      }
+    }
+  }, [episodeId]);
+
+  const handleInitialSrollIndex = () => {
+    const activeIndex = listEpisode.findIndex(
+      (item: any) => item.id === episodeId
+    );
+    if (activeIndex === -1) {
+      return 0;
+    }
+    return activeIndex;
+  };
+
+  const onScrollToIndexFailed = (error: any) => {
+    flatListRef.current?.scrollToOffset({
+      offset: error.averageItemLength * error.index,
+      animated: true,
+    });
+  };
 
   const queryClient = useQueryClient();
 
@@ -86,6 +132,9 @@ export default function AnimeStreamPage() {
           },
         })
         .then((res) => {
+          setListEpisode(res.data?.data?.anime?.Episode);
+          setAnimeId(res.data?.data?.animeId);
+          setAnimeTitle(res.data?.data?.anime?.title);
           return res.data?.data;
         })
         .catch((err) => {
@@ -93,7 +142,27 @@ export default function AnimeStreamPage() {
         }),
   });
 
-  if (episodeDetail.isLoading) {
+  // SHARING BUTTON
+
+  const shareUrl = async (
+    episodeId: string,
+    animeTitle: string,
+    episode: string
+  ) => {
+    try {
+      const result = await Share.share({
+        url: `https://anime.bagusok.dev/episode/${episodeId}`,
+        title: "Nonton Anime Gratis",
+        message: `Nonton ${animeTitle} - Episode ${episode} di Miramine! \n\nhttps://anime.bagusok.dev/episode/${episodeId}`,
+      });
+    } catch (error: any) {
+      Alert.alert("Error", error.toString());
+    }
+  };
+
+  // END SHARING BUTTON
+
+  if (episodeDetail.isLoading && listEpisode.length == 0) {
     return <LoadingPage />;
   }
 
@@ -103,117 +172,145 @@ export default function AnimeStreamPage() {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      {episodeDetail.data?.stream?.direct?.length > 0 &&
-      episodeDetail.data?.stream?.direct[0]?.source?.length > 0 ? (
-        <VideoPlayer
-          episodeId={episodeDetail.data.id}
-          title={`${episodeDetail.data.anime?.title} - Episode ${episodeDetail.data.episode}`}
-          data={episodeDetail.data.stream.direct}
-        />
-      ) : (
-        <StreamUrlNotFound />
-      )}
-      <View
-        style={{
-          backgroundColor: colors.background,
-          padding: 10,
-        }}
-      >
-        <CustomText fontStyle="medium" size={20}>
-          {episodeDetail.data.anime?.title}
-        </CustomText>
-
-        <View style={[styles.row]}>
-          <CustomText>Episode {episodeDetail.data.episode}</CustomText>
-          <Entypo name="dot-single" size={12} color={colors.text} />
-          <Feather name="eye" size={12} color={colors.text} />
-          <CustomText fontStyle="regular">
-            {episodeDetail.data.views}
-          </CustomText>
-          <Entypo name="dot-single" size={12} color={colors.text} />
-          <CustomText>{dateFormat(episodeDetail.data.createdAt)}</CustomText>
-        </View>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        {episodeDetail.data ? (
+          <VideoPlayer
+            episodeId={episodeDetail.data.id}
+            title={`${episodeDetail.data.anime?.title} - Episode ${episodeDetail.data.episode}`}
+            data={episodeDetail.data.stream.direct}
+          />
+        ) : (
+          <VideoLoading />
+        )}
 
         <View
           style={{
-            flexDirection: "row",
-            gap: 10,
-            marginTop: 20,
+            backgroundColor: colors.background,
+            padding: 10,
           }}
         >
-          <View style={styles.cardRowH30}>
-            <TouchableWithoutFeedback>
+          <CustomText fontStyle="medium" size={20}>
+            {animeTitle}
+          </CustomText>
+
+          <View style={[styles.row]}>
+            {episodeDetail.data ? (
+              <CustomText>Episode {episodeDetail.data.episode}</CustomText>
+            ) : (
+              <CustomText>Loading..</CustomText>
+            )}
+            <Entypo name="dot-single" size={12} color={colors.text} />
+            <Feather name="eye" size={12} color={colors.text} />
+            <CustomText fontStyle="regular">
+              {episodeDetail?.data?.views ?? 0}
+            </CustomText>
+            <Entypo name="dot-single" size={12} color={colors.text} />
+            <CustomText>
+              {dateFormat(episodeDetail?.data?.createdAt) ?? 0}
+            </CustomText>
+          </View>
+
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 10,
+              marginTop: 20,
+            }}
+          >
+            <TouchableOpacity style={styles.cardRowH30}>
               <AntDesign name="like2" size={16} color={colors.text} />
-            </TouchableWithoutFeedback>
-            <CustomText>|</CustomText>
-            <CustomText>1K</CustomText>
-            <Entypo name="dot-single" size={16} color={colors.text} />
-            <CustomText>0</CustomText>
-            <CustomText>|</CustomText>
-            <TouchableWithoutFeedback>
-              <AntDesign name="dislike2" size={16} color={colors.text} />
-            </TouchableWithoutFeedback>
-          </View>
-          <View style={styles.cardRowH30}>
-            <FontAwesome name="share" size={14} color={colors.text} />
-            <CustomText>Share</CustomText>
-          </View>
-          <View style={styles.cardRowH30}>
-            <Feather name="download" size={14} color={colors.text} />
-            <CustomText>Download</CustomText>
-          </View>
-        </View>
+              <CustomText>|</CustomText>
+              <CustomText>1K</CustomText>
+            </TouchableOpacity>
 
-        {/* Episode List */}
-        <CustomText fontStyle="medium" size={16} style={{ marginTop: 20 }}>
-          Episode
-        </CustomText>
-        <ScrollView
-          horizontal
-          contentContainerStyle={{
-            flexDirection: "row",
-            gap: 10,
-            marginTop: 10,
-          }}
-        >
-          {episodeDetail.data.anime?.Episode.map((episode: any) => (
-            <TouchableWithoutFeedback
-              onPress={() => setEpisodeId(episode.id)}
-              key={episode.id}
-              style={[
-                styles.cardEpisode,
-                {
-                  backgroundColor:
-                    episodeId === episode.id ? colors.primary : colors.muted,
-                },
-              ]}
+            <TouchableOpacity style={styles.cardRowH30}>
+              <Feather name="download" size={14} color={colors.text} />
+              <CustomText>Download</CustomText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.cardRowH30}
+              onPress={() =>
+                shareUrl(
+                  episodeDetail.data.id,
+                  episodeDetail.data.anime.title,
+                  episodeDetail.data.episode
+                )
+              }
             >
-              <CustomText>{episode.episode}</CustomText>
-            </TouchableWithoutFeedback>
-          ))}
-        </ScrollView>
+              <FontAwesome name="share" size={14} color={colors.text} />
+              <CustomText>Share</CustomText>
+            </TouchableOpacity>
+          </View>
 
-        {/* Comments */}
-        <CustomText fontStyle="medium" size={16} style={{ marginTop: 20 }}>
-          Comments
-        </CustomText>
+          {/* Episode List */}
+          <CustomText
+            fontStyle="medium"
+            size={16}
+            style={{ marginTop: 20, marginBottom: 10 }}
+          >
+            Episode
+          </CustomText>
 
-        {!addComment.isPending ? (
-          <CustomTextInput
-            onSubmitEditing={(e) =>
-              addComment.mutate({
-                animeId: episodeDetail.data.animeId,
-                comment: e.nativeEvent.text,
-              })
-            }
-            placeholder="Komen disini"
-            style={{ marginTop: 10 }}
+          <Animated.FlatList
+            ref={flatListRef}
+            horizontal
+            data={listEpisode}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item: episode, index }) => (
+              <TouchableOpacity
+                onPress={() => setEpisodeId(episode.id)}
+                key={episode.id}
+                style={[
+                  styles.cardEpisode,
+                  {
+                    backgroundColor:
+                      episodeId === episode.id ? colors.primary : colors.muted,
+                  },
+                ]}
+              >
+                <CustomText>{episode.episode}</CustomText>
+              </TouchableOpacity>
+            )}
+            getItemLayout={(data, index) => ({
+              length: 40 + 10, // Tambahkan margin ke panjang item
+              offset: (40 + 10) * index, // Tambahkan margin ke offset
+              index,
+            })}
+            initialScrollIndex={handleInitialSrollIndex()}
+            onScrollToIndexFailed={onScrollToIndexFailed}
+            initialNumToRender={30}
+            maxToRenderPerBatch={30}
+            onEndReachedThreshold={0.5}
+            showsHorizontalScrollIndicator={false}
+            snapToAlignment="start"
+            snapToInterval={40 + 10}
+            decelerationRate="fast"
           />
-        ) : (
-          <ActivityIndicator size="large" color={colors.primary} />
+
+          {/* Comments */}
+          <CustomText fontStyle="medium" size={16} style={{ marginTop: 20 }}>
+            Comments
+          </CustomText>
+
+          {!addComment.isPending && listEpisode.length > 0 ? (
+            <CustomTextInput
+              onSubmitEditing={(e) =>
+                addComment.mutate({
+                  animeId: episodeDetail.data.animeId,
+                  comment: e.nativeEvent.text,
+                })
+              }
+              placeholder="Komen disini"
+              style={{ marginTop: 10 }}
+            />
+          ) : (
+            <ActivityIndicator size="large" color={colors.primary} />
+          )}
+        </View>
+        {listEpisode.length > 0 && animeId !== "" && (
+          <CommentsSection animeId={animeId} />
         )}
       </View>
-      <CommentsSection animeId={episodeDetail.data.animeId} />
     </SafeAreaView>
   );
 }
@@ -241,6 +338,7 @@ const createStyles = (colors: ThemeColors) =>
       justifyContent: "center",
       alignItems: "center",
       borderRadius: 10,
+      marginRight: 10,
     },
     cardComment: {
       flexDirection: "row",

@@ -9,7 +9,7 @@ import { axiosIn } from "@/utils/axios";
 import { dateFormat, secondToMinutes } from "@/utils/format";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useAtomValue } from "jotai";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import {
@@ -32,28 +32,15 @@ interface CustomRefreshControlProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const CustomRefreshControl: React.FC<CustomRefreshControlProps> = ({
-  refreshing,
-  style,
-}) => {
-  return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      {refreshing && <ActivityIndicator size="large" color="#0000ff" />}
-    </View>
-  );
-};
-
 export default function HistoryPage() {
   const colors = useColors();
   const style = createStyles(colors);
 
   const token = useAtomValue(tokenAtom);
+
+  if (!token) {
+    return <Redirect href="/pages/login" />;
+  }
 
   const history = useInfiniteQuery({
     initialPageParam: 1,
@@ -118,21 +105,21 @@ export default function HistoryPage() {
         }
       >
         <View style={style.header}>
-          <CustomText fontStyle="semibold" size={16}>
+          <CustomText fontStyle="semibold" size={18}>
             History
           </CustomText>
         </View>
         <View style={style.container}>
           {flatData.map((item, index) => (
             <Fragment key={item.id}>
-              {dateFormat(item.createdAt) !==
-                dateFormat(flatData[index - 1]?.createdAt) && (
+              {dateFormat(item.updatedAt) !==
+                dateFormat(flatData[index - 1]?.updatedAt) && (
                 <CustomText
                   size={16}
                   fontStyle="semibold"
                   style={{ marginTop: 10 }}
                 >
-                  {dateFormat(item.createdAt)}
+                  {dateFormat(item.updatedAt)}
                 </CustomText>
               )}
               <Pressable
@@ -235,7 +222,7 @@ export default function HistoryPage() {
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     header: {
-      height: 50,
+      height: 60,
       paddingHorizontal: 14,
       flexDirection: "row",
       justifyContent: "space-between",

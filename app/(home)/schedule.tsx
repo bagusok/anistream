@@ -9,7 +9,7 @@ import { axiosIn } from "@/utils/axios";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { TouchableWithoutFeedback } from "react-native-gesture-handler";
 
 export default function AllAnime() {
@@ -38,17 +38,17 @@ export default function AllAnime() {
     <SafeAreaWrapper
       header={
         <View style={styles.header}>
-          <CustomText fontStyle="semibold" size={16}>
+          <CustomText fontStyle="semibold" size={18}>
             Schedule
           </CustomText>
         </View>
       }
     >
       <View style={styles.container}>
-        <ScrollView horizontal>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.tabHeader}>
             {schedule?.data?.map((item: any, index: number) => (
-              <TouchableWithoutFeedback
+              <TouchableOpacity
                 onPress={() =>
                   setSelectedDay({
                     day: item.day,
@@ -67,7 +67,7 @@ export default function AllAnime() {
                 ]}
               >
                 <CustomText fontStyle="medium">{item.day}</CustomText>
-              </TouchableWithoutFeedback>
+              </TouchableOpacity>
             ))}
           </View>
         </ScrollView>
@@ -84,7 +84,7 @@ export default function AllAnime() {
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     header: {
-      height: 50,
+      height: 60,
       paddingHorizontal: 14,
       flexDirection: "row",
       alignItems: "center",

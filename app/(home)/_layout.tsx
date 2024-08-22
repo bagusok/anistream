@@ -27,6 +27,8 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.border,
+          height: 60,
+          paddingTop: 8,
         },
       }}
     >
@@ -40,6 +42,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="schedule"
+        options={{
+          title: "Schedule",
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="calendar" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="all-anime"
         options={{
           title: "All",
@@ -48,12 +59,13 @@ export default function TabLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
-        name="schedule"
+        name="bookmark"
         options={{
-          title: "Schedule",
+          title: "Bookmark",
           tabBarIcon: ({ color, focused }) => (
-            <Feather name="calendar" size={24} color={color} />
+            <Feather name="bookmark" size={24} color={color} />
           ),
         }}
       />
