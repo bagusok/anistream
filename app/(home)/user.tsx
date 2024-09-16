@@ -2,6 +2,7 @@ import GoogleLogin from "@/components/auth/GoogleLogin";
 import SafeAreaWrapper from "@/components/SafeAreaWrapper";
 import { CustomText } from "@/components/ui";
 import { ThemeColors } from "@/constants/Colors";
+import { SAWERIA_URL } from "@/constants/Strings";
 import { useColors } from "@/hooks/useColors";
 import { tokenAtom, userAtom, UserRole } from "@/store/auth";
 import { themeAtom, ThemeType } from "@/store/theme";
@@ -10,7 +11,7 @@ import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { Image } from "expo-image";
 import { Redirect } from "expo-router";
 import { useAtom, useAtomValue } from "jotai";
-import { Alert, StyleSheet, Switch, View } from "react-native";
+import { Alert, Linking, StyleSheet, Switch, View } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 
 export default function AllAnime() {
@@ -64,28 +65,33 @@ export default function AllAnime() {
             </CustomText>
           </View>
         </View>
-        <TouchableOpacity style={[styles.card, styles.mt20, styles.row]}>
+        <TouchableOpacity
+          style={[styles.card, styles.mt20, styles.row]}
+          onPress={() => Linking.openURL(SAWERIA_URL)}
+        >
           <CustomText fontStyle="medium" size={14}>
-            Sawer dulu ngab!
+            Sawer dulu ngab! Buat beli dev console
           </CustomText>
           <CustomText>
             <Feather name="chevron-right" size={16} />
           </CustomText>
         </TouchableOpacity>
 
-        <View style={[styles.card, styles.mt20, styles.row]}>
+        <TouchableOpacity style={[styles.card, styles.mt20, styles.row]} onPress={() => toggleTheme()}>
           <CustomText size={14} fontStyle="semibold">
             Darkmode
+            <CustomText size={12} color={colors.text}>
+              &nbsp; (Jangan Diklik Ntar Jelek)
+            </CustomText>
           </CustomText>
           <Switch
             thumbColor={colors.primary}
             style={{
               transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
             }}
-            onValueChange={toggleTheme}
             value={theme == ThemeType.Dark}
           />
-        </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={{ marginTop: 20 }}

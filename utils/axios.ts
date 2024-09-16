@@ -1,10 +1,35 @@
-import axios, { AxiosResponse } from "axios";
+import { APP_VERSION, USER_AGENT } from "@/constants/Strings";
+import axios from "axios";
 import crypto from "react-native-quick-crypto";
 
 export const axiosIn = axios.create({
-  // headers: {
-  //   "User-Agent": "Animeku",
-  // },
+  headers: {
+    "User-Agent": USER_AGENT,
+    "x-app-id": "miramine",
+    "x-app-version": APP_VERSION,
+  },
+});
+
+axiosIn.interceptors.request.use((config) => {
+  const method = config.method?.toUpperCase() || "";
+  const path = config.url || "";
+  const endpoint = new URL(config.baseURL + path).pathname;
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const timestampPlus5Min = timestamp + 300;
+
+  const stringToHash = `${method}:${endpoint}:${timestampPlus5Min}`;
+
+  const hashKey = process.env.EXPO_PUBLIC_HASH_KEY || "";
+  const hash = crypto
+    .createHmac("sha256", hashKey)
+    .update(stringToHash)
+    .digest("hex");
+
+  config.headers["x-timestamp"] = timestamp.toString();
+  config.headers["x-signature"] = hash;
+
+  return config;
 });
 
 axiosIn.interceptors.response.use(
@@ -17,7 +42,6 @@ axiosIn.interceptors.response.use(
         response.data = data;
       } catch (error) {
         response.data = {};
-
         console.error("Error decrypting response:", error);
       }
     }
@@ -41,7 +65,7 @@ axiosIn.interceptors.response.use(
 const ENCRYPTION_KEY = hexStringToUint8Array(
   process.env.EXPO_PUBLIC_ENCRYPTION_KEY || ""
 );
-const IV_LENGTH = 12; // Panjang IV yang digunakan untuk AES-256-GCM
+const IV_LENGTH = 12;
 
 if (ENCRYPTION_KEY.length !== 32) {
   throw new Error(
@@ -49,7 +73,6 @@ if (ENCRYPTION_KEY.length !== 32) {
   );
 }
 
-// Fungsi untuk mengonversi string hexadecimal ke Uint8Array
 function hexStringToUint8Array(hexString: string): Uint8Array {
   if (hexString.length % 2 !== 0) {
     throw new Error("Hex string length must be even.");
@@ -63,12 +86,9 @@ function hexStringToUint8Array(hexString: string): Uint8Array {
   return arrayBuffer;
 }
 
-// Fungsi untuk mendekripsi data
 const decrypt = (encryptedText: string): string => {
   try {
     const [ivHex, authTagHex, _encryptedBase64] = encryptedText.split(":");
-
-    // console.log(encryptedText);
 
     if (!ivHex || !authTagHex || !_encryptedBase64) {
       throw new Error(

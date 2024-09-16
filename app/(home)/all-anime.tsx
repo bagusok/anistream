@@ -1,3 +1,4 @@
+import ErrorPage from "@/components/ErrorPage";
 import LoadingPage from "@/components/LoadingPage";
 import SafeAreaWrapper from "@/components/SafeAreaWrapper";
 import { CustomText } from "@/components/ui";
@@ -33,7 +34,7 @@ export default function AllAnime() {
         .get(`${API_URL}/anime?page=${pageParam}`)
         .then((res) => res.data)
         .catch((err) => {
-          console.log(err);
+          console.error(err);
           throw new Error(err);
         }),
     getNextPageParam: (lastPage) => {
@@ -49,6 +50,10 @@ export default function AllAnime() {
 
   if (allAnime.isLoading) {
     return <LoadingPage />;
+  }
+
+  if (allAnime.isError) {
+    return <ErrorPage />;
   }
 
   return (

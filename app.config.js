@@ -1,5 +1,5 @@
 export default {
-  name: "anime-stream",
+  name: "Miramine",
   slug: "anime-stream",
   version: "1.0.0",
   orientation: "portrait",

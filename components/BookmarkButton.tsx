@@ -54,7 +54,7 @@ export default function BookmarkButton({ animeId }: { animeId: string }) {
           return res.data.data;
         })
         .catch((err) => {
-          console.log(err.response.data.message || err.message);
+          console.error(err.response.data.message || err.message);
           throw new Error(err.response.data.message || err.message);
         }),
   });

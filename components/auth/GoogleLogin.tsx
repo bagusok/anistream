@@ -39,7 +39,7 @@ export default function GoogleLogin(props: GoogleLoginProps) {
                 });
 
                 if (error) {
-                  console.log("ERROR SUPABASE LOGIN: ", error);
+                  console.error("ERROR SUPABASE LOGIN: ", error);
                   Alert.alert("Error logging in with Supabase!");
                 } else {
                   const getToken = await axiosIn.post(
@@ -55,12 +55,11 @@ export default function GoogleLogin(props: GoogleLoginProps) {
                   );
 
                   if (getToken.data && getToken.data.status == true) {
-                    console.log("TOKEN: ", getToken.data);
                     setToken(getToken.data.data.token);
                     ToastAndroid.show("Login berhasil!", ToastAndroid.SHORT);
                     router.push("/(home)/");
                   } else {
-                    console.log("NO TOKEN: ", getToken.data);
+                    console.info("NO TOKEN: ", getToken.data);
                     Alert.alert("No token found!");
                   }
                 }
@@ -71,7 +70,7 @@ export default function GoogleLogin(props: GoogleLoginProps) {
               setIsLoading(false);
             } catch (error: any) {
               setIsLoading(false);
-              console.log(error);
+              console.error(error);
               if (error.code === statusCodes.SIGN_IN_CANCELLED) {
                 // user cancelled the login flow
               } else if (error.code === statusCodes.IN_PROGRESS) {

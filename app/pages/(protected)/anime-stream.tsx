@@ -19,17 +19,15 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  LayoutChangeEvent,
   Share,
   StyleSheet,
-  useWindowDimensions,
   View,
 } from "react-native";
-import { ScrollView, TouchableOpacity } from "react-native-gesture-handler";
+import { TouchableOpacity } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Sharing from "expo-sharing";
 import Animated from "react-native-reanimated";
 import VideoLoading from "@/components/ui/VideoLoading";
+import LikeDislikeAnime from "@/components/LikeDislikeAnime";
 
 interface Episode {
   id: string;
@@ -43,6 +41,9 @@ export default function AnimeStreamPage() {
   const [animeTitle, setAnimeTitle] = useState<string>("");
 
   const [listEpisode, setListEpisode] = useState<any>([]);
+
+  const queryClient = useQueryClient();
+  const token = useAtomValue(tokenAtom);
 
   const colors = useColors();
   const styles = createStyles(colors);
@@ -80,10 +81,6 @@ export default function AnimeStreamPage() {
       animated: true,
     });
   };
-
-  const queryClient = useQueryClient();
-
-  const token = useAtomValue(tokenAtom);
 
   const addComment = useMutation({
     mutationKey: ["addComment"],
@@ -151,9 +148,9 @@ export default function AnimeStreamPage() {
   ) => {
     try {
       const result = await Share.share({
-        url: `https://anime.bagusok.dev/episode/${episodeId}`,
+        url: `https://anime.bagusok.dev/`,
         title: "Nonton Anime Gratis",
-        message: `Nonton ${animeTitle} - Episode ${episode} di Miramine! \n\nhttps://anime.bagusok.dev/episode/${episodeId}`,
+        message: `Nonton ${animeTitle} - Episode ${episode} di Miramine! \n\nhttps://anime.bagusok.dev/`,
       });
     } catch (error: any) {
       Alert.alert("Error", error.toString());
@@ -217,11 +214,7 @@ export default function AnimeStreamPage() {
               marginTop: 20,
             }}
           >
-            <TouchableOpacity style={styles.cardRowH30}>
-              <AntDesign name="like2" size={16} color={colors.text} />
-              <CustomText>|</CustomText>
-              <CustomText>1K</CustomText>
-            </TouchableOpacity>
+            <LikeDislikeAnime animeId={animeId} />
 
             <TouchableOpacity style={styles.cardRowH30}>
               <Feather name="download" size={14} color={colors.text} />

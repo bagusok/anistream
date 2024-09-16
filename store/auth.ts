@@ -27,20 +27,20 @@ export const userAtom = atomWithQuery<User>((get) => ({
   queryKey: ["users", get(tokenAtom)],
   queryFn: async () => {
     const token = await get(tokenAtom);
-    console.info(
-      "Token",
-      typeof token === "string" ? token : JSON.stringify(token)
-    );
+    // console.info(
+    //   "Token",
+    //   typeof token === "string" ? token : JSON.stringify(token)
+    // );
 
     const authorization = token ? { Authorization: `Bearer ${token}` } : {};
-    console.info("Authorization", authorization);
+    // console.info("Authorization", authorization);
 
     return axiosIn
       .get(`${API_URL}/anime/user/ping`, {
         headers: { ...authorization },
       })
       .then((res) => {
-        console.info("User data", res.data?.data);
+        // console.info("User data", res.data?.data);
         return res.data?.data ?? null;
       })
       .catch((err) => {

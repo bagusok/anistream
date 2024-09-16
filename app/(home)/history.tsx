@@ -1,3 +1,4 @@
+import ErrorPage from "@/components/ErrorPage";
 import LoadingPage from "@/components/LoadingPage";
 import SafeAreaWrapper from "@/components/SafeAreaWrapper";
 import { CustomText } from "@/components/ui";
@@ -9,9 +10,9 @@ import { axiosIn } from "@/utils/axios";
 import { dateFormat, secondToMinutes } from "@/utils/format";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import { Redirect, router } from "expo-router";
+import { Redirect, router, useFocusEffect } from "expo-router";
 import { useAtomValue } from "jotai";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -64,9 +65,11 @@ export default function HistoryPage() {
     },
   });
 
-  useEffect(() => {
-    console.log("aaa");
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      history.refetch();
+    }, [history.refetch])
+  );
 
   const flatData = useMemo(
     () => history.data?.pages.flatMap((page) => page.data) ?? [],
@@ -75,6 +78,10 @@ export default function HistoryPage() {
 
   if (history.isLoading) {
     return <LoadingPage />;
+  }
+
+  if (history.isError) {
+    return <ErrorPage />;
   }
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

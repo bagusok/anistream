@@ -10,9 +10,9 @@ import { tokenAtom } from "@/store/auth";
 import { axiosIn } from "@/utils/axios";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Redirect } from "expo-router";
+import { Redirect, useFocusEffect } from "expo-router";
 import { useAtomValue } from "jotai";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -58,6 +58,12 @@ export default function BookmarkPage() {
   const flatData = useMemo(
     () => allBookmark.data?.pages.flatMap((page) => page.data) ?? [],
     [allBookmark.data]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      allBookmark.refetch();
+    }, [allBookmark.refetch])
   );
 
   if (allBookmark.isLoading) {

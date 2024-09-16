@@ -16,7 +16,6 @@ import { Link, router, useLocalSearchParams } from "expo-router";
 import {
   Alert,
   Dimensions,
-  FlatList,
   Pressable,
   Share,
   StyleSheet,
@@ -81,9 +80,9 @@ export default function TestDetailPage() {
   const shareUrl = async (animeId: string, animeTitle: string) => {
     try {
       const result = await Share.share({
-        url: `https://anime.bagusok.dev/anime/${animeId}`,
+        url: `https://anime.bagusok.dev/`,
         title: "Nonton Anime Gratis",
-        message: `Nonton ${animeTitle} hanya di Miramine! \n\nhttps://anime.bagusok.dev/anime/${animeId}`,
+        message: `Nonton ${animeTitle} hanya di Miramine! \n\nhttps://anime.bagusok.dev`,
       });
     } catch (error: any) {
       Alert.alert("Error", error.toString());
@@ -210,6 +209,22 @@ export default function TestDetailPage() {
                 paddingHorizontal: 20,
               }}
             >
+              {animeDetail.data.status == "ONGOING" && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    gap: 6,
+                    alignItems: "center",
+                  }}
+                >
+                  <Feather name="clock" size={12} color={colors.primary} />
+                  <CustomText>
+                    {animeDetail.data?.malData?.broadcast.day}{" "}
+                    {animeDetail.data?.malData?.broadcast.time} (
+                    {animeDetail.data?.malData?.broadcast.timezone})
+                  </CustomText>
+                </View>
+              )}
               <CustomText size={24} fontStyle="medium">
                 {animeDetail.data?.titleShow ?? animeDetail.data.title}
               </CustomText>

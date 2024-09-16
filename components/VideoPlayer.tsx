@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   BackHandler,
   LayoutChangeEvent,
+  Platform,
   StatusBar,
   useWindowDimensions,
   View,
@@ -115,11 +116,10 @@ const VideoPlayer = memo(
             }
           )
           .then((res) => {
-            console.log(res.data);
             return res.data;
           })
           .catch((err) => {
-            console.log(err);
+            console.error(err);
             return err;
           }),
     });
@@ -174,7 +174,6 @@ const VideoPlayer = memo(
 
       const top = layarKosongVertical < 0 ? 5 : layarKosongVertical / 2;
       const right = layarKosongHorizontal < 0 ? 5 : layarKosongHorizontal / 2;
-      console.log("aa", videoHeight, videoSize.height, layarKosongVertical);
 
       setOverlaySize({
         width: right,
@@ -254,15 +253,8 @@ const VideoPlayer = memo(
 
     const toggleFullscreen = async () => {
       if (!isFullscreen) {
-        // await ScreenOrientation.lockAsync(
-        //   ScreenOrientation.OrientationLock.LANDSCAPE
-        // );
         setIsFullscreen(true);
       } else {
-        // await ScreenOrientation.lockAsync(
-        //   ScreenOrientation.OrientationLock.PORTRAIT
-        // );
-
         if (
           orientation == ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
           orientation == ScreenOrientation.Orientation.LANDSCAPE_RIGHT
@@ -357,13 +349,10 @@ const VideoPlayer = memo(
       });
 
     const singleTap = Gesture.Tap().onStart((event) => {
-      console.log("Single Tap");
       runOnJS(showControlsWithTimeout)();
     });
 
     const overlayTap = Gesture.Tap().onStart(() => {
-      console.log("Overlay Tap");
-      // runOnJS(resetTimeout)();
       runOnJS(hideControls)();
     });
 
@@ -374,7 +363,6 @@ const VideoPlayer = memo(
     };
 
     const openBottomSheet = () => {
-      console.log("open bottom sheet");
       bottomSheetRef.current?.present();
     };
 
@@ -440,7 +428,7 @@ const VideoPlayer = memo(
                     }
                   } else if (status.error) {
                     setVideoStatus(VideoStatus.ERROR);
-                    console.log("Error", status.error);
+                    console.error("Error", status.error);
                   }
                 }}
                 onLoadStart={() => setVideoStatus(VideoStatus.LOADING)}

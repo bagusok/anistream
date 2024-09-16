@@ -1,11 +1,8 @@
 import {
   StyleSheet,
   Platform,
-  Button,
   View,
   ScrollView,
-  Pressable,
-  Linking,
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
@@ -17,16 +14,17 @@ import { ThemeColors } from "@/constants/Colors";
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { axiosIn } from "@/utils/axios";
-import { API_URL } from "@/constants/Strings";
+import { API_URL, GITHUB_REPO_URL } from "@/constants/Strings";
 import { useEffect, useRef, useState } from "react";
-import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { CardAnimeOngoing } from "@/components/ui/card-anime";
 import CardAnimeHorizontal from "@/components/ui/card-anime/CardAnimeHorizontal";
 import { router } from "expo-router";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
+import * as Linking from "expo-linking";
 import Constants from "expo-constants";
+import { useAtomValue } from "jotai";
+import { tokenAtom, userAtom, UserRole } from "@/store/auth";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -41,7 +39,8 @@ export default function HomeScreen() {
   const styles = createStyle(colors);
   const [expoPushToken, setExpoPushToken] = useState("");
 
-  // console.log("HomeSc", expoPushToken);
+  const user = useAtomValue(userAtom);
+  const token = useAtomValue(tokenAtom);
 
   const getAnimeHome = useQuery({
     queryKey: ["animeHome"],
@@ -49,20 +48,53 @@ export default function HomeScreen() {
       axiosIn
         .get(`${API_URL}/anime/home`)
         .then((res) => {
-          // console.log(res.data);
           return res.data.data;
         })
         .catch((err) => {
-          console.log(err);
+          console.error(err);
           return err;
+        }),
+  });
+
+  const registerNotification = useMutation({
+    mutationKey: ["registerNotification", expoPushToken],
+    mutationFn: () =>
+      axiosIn
+        .post(
+          `${API_URL}/anime/user/notification/register`,
+          {
+            token: expoPushToken,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        )
+        .then((res) => {
+          console.log("Reg Notofication Res: ", res.data);
+          return res.data;
+        })
+        .catch((err) => {
+          console.log("Reg Notofication Err: ", err);
+          throw new Error(err);
         }),
   });
 
   useEffect(() => {
     registerForPushNotificationsAsync()
-      .then((token) => setExpoPushToken(token ?? ""))
-      .catch((error: any) => setExpoPushToken(`${error}`));
+      .then((token) => token && setExpoPushToken(token))
+      .catch((error: any) => {
+        console.error("Error Expo Notif: ", error);
+        setExpoPushToken("");
+      });
   }, []);
+
+  useEffect(() => {
+    if (user.data?.role !== UserRole.GUEST && expoPushToken) {
+      registerNotification.mutate();
+    }
+  }, [user?.data, expoPushToken]);
 
   return (
     <SafeAreaWrapper
@@ -97,9 +129,7 @@ export default function HomeScreen() {
           <CustomText fontStyle="regular">
             Support dengan like repo di github dan share ke teman-teman kalian.
             <CustomText
-              onPress={() =>
-                Linking.openURL("https://github.com/bagusok/anistream")
-              }
+              onPress={() => Linking.openURL(GITHUB_REPO_URL)}
               fontStyle="medium"
               color={colors.primary}
               style={{
