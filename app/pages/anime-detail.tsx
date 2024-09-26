@@ -391,7 +391,7 @@ export default function TestDetailPage() {
         }
         data={animeDetail.data.Episode}
         keyExtractor={(item) => item.id}
-        renderItem={({ item: episode }) => (
+        renderItem={({ item: episode, index }) => (
           <Pressable
             key={episode.id}
             onPress={() =>
@@ -400,6 +400,8 @@ export default function TestDetailPage() {
                 pathname: "/pages/anime-stream",
                 params: {
                   episodeId: episode.id,
+                  indexNow: index,
+                  indexMax: animeDetail.data.Episode.length - 1,
                 },
               })
             }

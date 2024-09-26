@@ -35,8 +35,12 @@ interface Episode {
 }
 
 export default function AnimeStreamPage() {
-  const { episodeId: id } = useLocalSearchParams();
+  const { episodeId: id, indexNow, indexMax } = useLocalSearchParams();
   const [episodeId, setEpisodeId] = useState(id);
+  const [episodeIndex, setEpisodeIndex] = useState({
+    indexNow: Number(indexNow),
+    indexMax: Number(indexMax),
+  });
   const [animeId, setAnimeId] = useState<string>("");
   const [animeTitle, setAnimeTitle] = useState<string>("");
 
@@ -56,6 +60,10 @@ export default function AnimeStreamPage() {
         (item: any) => item.id === episodeId
       );
       if (activeIndex !== -1) {
+        setEpisodeIndex({
+          indexNow: activeIndex,
+          indexMax: listEpisode.length - 1,
+        });
         flatListRef.current.scrollToIndex({
           index: activeIndex,
           animated: true,
@@ -159,6 +167,22 @@ export default function AnimeStreamPage() {
 
   // END SHARING BUTTON
 
+  const isHaveNextEpisode = () => episodeIndex.indexNow < episodeIndex.indexMax;
+
+  const isHavePrevEpisode = () => episodeIndex.indexNow > 0;
+
+  const nextEpisode = () => {
+    if (isHaveNextEpisode()) {
+      setEpisodeId(listEpisode[episodeIndex.indexNow + 1].id);
+    }
+  };
+
+  const prevEpisode = () => {
+    if (isHavePrevEpisode()) {
+      setEpisodeId(listEpisode[episodeIndex.indexNow - 1].id);
+    }
+  };
+
   if (episodeDetail.isLoading && listEpisode.length == 0) {
     return <LoadingPage />;
   }
@@ -175,6 +199,10 @@ export default function AnimeStreamPage() {
             episodeId={episodeDetail.data.id}
             title={`${episodeDetail.data.anime?.title} - Episode ${episodeDetail.data.episode}`}
             data={episodeDetail.data.stream.direct}
+            isHaveNextEpisode={isHaveNextEpisode()}
+            isHavePrevEpisode={isHavePrevEpisode()}
+            nextEpisode={nextEpisode}
+            prevEpisode={prevEpisode}
           />
         ) : (
           <VideoLoading />
@@ -251,7 +279,9 @@ export default function AnimeStreamPage() {
             keyExtractor={(item) => item.id}
             renderItem={({ item: episode, index }) => (
               <TouchableOpacity
-                onPress={() => setEpisodeId(episode.id)}
+                onPress={() => {
+                  setEpisodeId(episode.id);
+                }}
                 key={episode.id}
                 style={[
                   styles.cardEpisode,
