@@ -40,7 +40,7 @@ import { axiosIn } from "@/utils/axios";
 import { API_URL } from "@/constants/Strings";
 import { useAtomValue } from "jotai";
 import { tokenAtom } from "@/store/auth";
-import * as Sharing from "expo-sharing";
+import * as KeepAwake from "expo-keep-awake";
 import StreamUrlNotFound from "./ui/error/StreamUrlNotFound";
 
 const VideoPlayer = memo(
@@ -48,9 +48,17 @@ const VideoPlayer = memo(
     episodeId,
     title,
     data,
+    isHaveNextEpisode,
+    isHavePrevEpisode,
+    nextEpisode,
+    prevEpisode,
   }: {
     episodeId: string;
     title?: string;
+    isHaveNextEpisode: boolean;
+    isHavePrevEpisode: boolean;
+    nextEpisode: () => void;
+    prevEpisode: () => void;
     data: Array<any>;
   }) => {
     if (data.length == 0 || data[0]?.source?.length == 0) {
@@ -217,7 +225,7 @@ const VideoPlayer = memo(
 
       const allSources = data.flatMap((server: any) => server.source);
       allSources.sort((a, b) => {
-        const qualityOrder = ["1080p", "720p", "480p", "360p", "4K"];
+        const qualityOrder = ["1080p", "720p", "480p", "360p", "240p", 'auto', "4K"];
         return (
           qualityOrder.indexOf(a.quality) - qualityOrder.indexOf(b.quality)
         );
@@ -421,6 +429,12 @@ const VideoPlayer = memo(
                       (status.playableDurationMillis ?? 0) <=
                       status.positionMillis;
 
+                    if (status.isPlaying) {
+                      KeepAwake.activateKeepAwakeAsync();
+                    } else {
+                      KeepAwake.deactivateKeepAwake();
+                    }
+
                     if (buffering) {
                       setVideoStatus(VideoStatus.BUFFERING);
                     } else {
@@ -599,6 +613,67 @@ const VideoPlayer = memo(
                         setProgress(value);
                       }}
                     />
+                    <View
+                      style={{
+                        display:
+                          orientation ==
+                            ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+                          orientation ==
+                            ScreenOrientation.Orientation.LANDSCAPE_RIGHT
+                            ? "flex"
+                            : "none",
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        marginTop: 10,
+                        paddingHorizontal: 16,
+                      }}
+                    >
+                      {isHavePrevEpisode ? (
+                        <GestureDetector
+                          gesture={Gesture.Tap().onEnd(() => {
+                            runOnJS(prevEpisode)();
+                          })}
+                        >
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: "row",
+                              gap: 5,
+                              alignItems: "center",
+                            }}
+                          >
+                            <Feather name="skip-back" size={16} color="white" />
+                            <CustomText>Previous Episode</CustomText>
+                          </TouchableOpacity>
+                        </GestureDetector>
+                      ) : (
+                        <View />
+                      )}
+
+                      {isHaveNextEpisode ? (
+                        <GestureDetector
+                          gesture={Gesture.Tap().onEnd(() => {
+                            runOnJS(nextEpisode)();
+                          })}
+                        >
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: "row",
+                              gap: 5,
+                              alignItems: "center",
+                            }}
+                          >
+                            <CustomText>Next Episode</CustomText>
+                            <Feather
+                              name="skip-forward"
+                              size={16}
+                              color="white"
+                            />
+                          </TouchableOpacity>
+                        </GestureDetector>
+                      ) : (
+                        <View />
+                      )}
+                    </View>
                   </View>
                 </View>
               </GestureDetector>
