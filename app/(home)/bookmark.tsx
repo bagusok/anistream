@@ -2,85 +2,102 @@ import ErrorPage from "@/components/ErrorPage";
 import LoadingPage from "@/components/LoadingPage";
 import SafeAreaWrapper from "@/components/SafeAreaWrapper";
 import { CustomText } from "@/components/ui";
-import CardAllAnime from "@/components/ui/card-anime/CardAllAnime";
+import CardAnimeSearch from "@/components/ui/card-anime/CardAnimeSearch";
 import { ThemeColors } from "@/constants/Colors";
 import { API_URL } from "@/constants/Strings";
 import { useColors } from "@/hooks/useColors";
+import { tokenAtom } from "@/store/auth";
 import { axiosIn } from "@/utils/axios";
-import { Feather } from "@expo/vector-icons";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useMemo } from "react";
+import { Redirect, useFocusEffect } from "expo-router";
+import { useAtomValue } from "jotai";
+import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
+  RefreshControl,
   StyleSheet,
-  Touchable,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { FlatList } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function AllAnime() {
+export default function BookmarkPage() {
   const colors = useColors();
   const style = createStyles(colors);
+  const token = useAtomValue(tokenAtom);
 
-  const allAnime = useInfiniteQuery({
+  if (!token) {
+    return <Redirect href="/pages/login" />;
+  }
+
+  const allBookmark = useInfiniteQuery({
     initialPageParam: 1,
-    queryKey: ["allAnime"],
+    queryKey: ["bookmark"],
     queryFn: async ({ pageParam }) =>
       axiosIn
-        .get(`${API_URL}/anime?page=${pageParam}`)
-        .then((res) => res.data)
+        .get(`${API_URL}/anime/user/bookmark?page=${pageParam}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+        .then((res) => {
+          //   console.log(res.data.data);
+          return res.data;
+        })
         .catch((err) => {
-          console.error(err);
+          console.log(err);
           throw new Error(err);
         }),
     getNextPageParam: (lastPage) => {
-      const nextPage = lastPage.pagination.page + 1;
-      return nextPage <= lastPage.pagination.totalPage ? nextPage : null;
+      const nextPage = (lastPage?.pagination?.page ?? 0) + 1;
+      return nextPage <= lastPage?.pagination?.totalPage ? nextPage : null;
     },
   });
 
   const flatData = useMemo(
-    () => allAnime.data?.pages.flatMap((page) => page.data) ?? [],
-    [allAnime.data]
+    () => allBookmark.data?.pages.flatMap((page) => page.data) ?? [],
+    [allBookmark.data]
   );
 
-  if (allAnime.isLoading) {
+  useFocusEffect(
+    useCallback(() => {
+      allBookmark.refetch();
+    }, [allBookmark.refetch])
+  );
+
+  if (allBookmark.isLoading) {
     return <LoadingPage />;
   }
 
-  if (allAnime.isError) {
+  if (allBookmark.isError) {
     return <ErrorPage />;
   }
 
   return (
-    <SafeAreaView>
+    <SafeAreaView style={{ flex: 1 }}>
       <View style={style.header}>
         <CustomText fontStyle="semibold" size={18}>
-          All Anime
+          Bookmark
         </CustomText>
-        <TouchableOpacity
-          onPress={() =>
-            router.push({
-              pathname: "/pages/search",
-            })
-          }
-        >
-          <Feather name="search" size={20} color={colors.text} />
-        </TouchableOpacity>
       </View>
       <View style={style.container}>
+        <View style={style.tabHeader}>
+          <CustomText
+            style={[style.tabHeaderItem, { backgroundColor: colors.muted }]}
+          >
+            All
+          </CustomText>
+        </View>
         <FlatList
           data={flatData}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <CardAllAnime key={item.id} item={item} />}
-          ItemSeparatorComponent={() => <View style={{ height: 24 }} />}
+          renderItem={({ item }) => (
+            <CardAnimeSearch key={item.id} anime={item} />
+          )}
           onEndReached={() => {
-            if (allAnime.hasNextPage) {
-              allAnime.fetchNextPage();
+            if (allBookmark.hasNextPage) {
+              allBookmark.fetchNextPage();
             }
           }}
           onEndReachedThreshold={0.5}
@@ -88,10 +105,17 @@ export default function AllAnime() {
           maxToRenderPerBatch={10}
           windowSize={10}
           removeClippedSubviews={true}
+          numColumns={3}
           ListFooterComponent={
-            allAnime.isFetchingNextPage ? (
+            allBookmark.isFetchingNextPage ? (
               <ActivityIndicator color={colors.primary} />
             ) : null
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={allBookmark.isRefetching}
+              onRefresh={allBookmark.refetch}
+            />
           }
         />
       </View>
@@ -114,6 +138,16 @@ const createStyles = (colors: ThemeColors) =>
       paddingHorizontal: 14,
       paddingBottom: 100,
       backgroundColor: colors.background,
+      flex: 1,
+    },
+    tabHeader: {
+      flexDirection: "row",
+      gap: 14,
+    },
+    tabHeaderItem: {
+      paddingHorizontal: 14,
+      paddingVertical: 5,
+      borderRadius: 14,
     },
     cardAnime: {
       flexDirection: "row",

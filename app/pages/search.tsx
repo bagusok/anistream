@@ -4,9 +4,11 @@ import CardAnimeSearch from "@/components/ui/card-anime/CardAnimeSearch";
 import { API_URL } from "@/constants/Strings";
 import { useColors } from "@/hooks/useColors";
 import { axiosIn } from "@/utils/axios";
+import { Feather } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, TouchableOpacity, View } from "react-native";
 
 export default function SearchPage() {
   const colors = useColors();
@@ -22,43 +24,67 @@ export default function SearchPage() {
   });
 
   return (
-    <SafeAreaWrapper
-      style={{
-        paddingHorizontal: 10,
-        paddingVertical: 20,
-      }}
-    >
-      <CustomTextInput
-        placeholder="Bordog"
-        style={{ marginTop: 40 }}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        onSubmitEditing={() => search.mutate()}
-      ></CustomTextInput>
-
-      {search.isPending && (
-        <ActivityIndicator
-          color={colors.primary}
-          style={{
-            marginTop: 20,
-          }}
-          size="large"
-        />
-      )}
-
-      {search?.data && (
+    <SafeAreaWrapper>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          height: 60,
+          paddingHorizontal: 14,
+        }}
+      >
+        <TouchableOpacity onPress={() => router.back()}>
+          <Feather name="arrow-left" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <CustomText fontStyle="bold" size={18}>
+          Search
+        </CustomText>
         <View
           style={{
-            flex: 1,
-            flexDirection: "row",
-            flexWrap: "wrap",
+            width: 24,
           }}
-        >
-          {search.data.map((anime: any) => (
-            <CardAnimeSearch anime={anime} key={anime.id} />
-          ))}
-        </View>
-      )}
+        ></View>
+      </View>
+      <View
+        style={{
+          paddingHorizontal: 14,
+          paddingVertical: 14,
+        }}
+      >
+        <CustomTextInput
+          placeholder="Bordog"
+          style={{ marginTop: 10 }}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSubmitEditing={() => search.mutate()}
+        ></CustomTextInput>
+
+        {search.isPending && (
+          <ActivityIndicator
+            color={colors.primary}
+            style={{
+              marginTop: 20,
+            }}
+            size="large"
+          />
+        )}
+
+        {search?.data && (
+          <View
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              flexWrap: "wrap",
+              marginTop: 20,
+            }}
+          >
+            {search.data.map((anime: any) => (
+              <CardAnimeSearch anime={anime} key={anime.id} />
+            ))}
+          </View>
+        )}
+      </View>
     </SafeAreaWrapper>
   );
 }

@@ -27,7 +27,7 @@ export default function CardAnimeOngoing({ anime }: { anime: any }) {
             source={{ uri: anime.anime.imageUrl }}
             style={styles.animeCardImage}
             contentFit="cover"
-            onLoad={() => console.log("loaded")}
+            // onLoad={() => console.log("loaded")}
           />
           <View
             style={{

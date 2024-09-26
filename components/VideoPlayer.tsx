@@ -1,4 +1,4 @@
-import { ResizeMode, Video } from "expo-av";
+import { AVPlaybackStatus, ResizeMode, Video } from "expo-av";
 import {
   Fragment,
   useCallback,
@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   BackHandler,
   LayoutChangeEvent,
-  Pressable,
+  Platform,
   StatusBar,
   useWindowDimensions,
   View,
@@ -20,7 +20,7 @@ import {
 import {
   Gesture,
   GestureDetector,
-  TouchableWithoutFeedback,
+  TouchableOpacity,
 } from "react-native-gesture-handler";
 import { CustomText } from "./ui";
 import { runOnJS } from "react-native-reanimated";
@@ -35,10 +35,38 @@ import {
   BottomSheetView,
 } from "@gorhom/bottom-sheet";
 import { Image } from "expo-image";
+import { useMutation } from "@tanstack/react-query";
+import { axiosIn } from "@/utils/axios";
+import { API_URL } from "@/constants/Strings";
+import { useAtomValue } from "jotai";
+import { tokenAtom } from "@/store/auth";
+import * as KeepAwake from "expo-keep-awake";
+import StreamUrlNotFound from "./ui/error/StreamUrlNotFound";
 
 const VideoPlayer = memo(
-  ({ src, title, data }: { src: string; title?: string; data: [] }) => {
+  ({
+    episodeId,
+    title,
+    data,
+    isHaveNextEpisode,
+    isHavePrevEpisode,
+    nextEpisode,
+    prevEpisode,
+  }: {
+    episodeId: string;
+    title?: string;
+    isHaveNextEpisode: boolean;
+    isHavePrevEpisode: boolean;
+    nextEpisode: () => void;
+    prevEpisode: () => void;
+    data: Array<any>;
+  }) => {
+    if (data.length == 0 || data[0]?.source?.length == 0) {
+      return <StreamUrlNotFound />;
+    }
+
     const colors = useColors();
+    const token = useAtomValue(tokenAtom);
 
     const videoRef = useRef<Video>(null);
     const [showVideoControls, setShowVideoControls] = useState(true);
@@ -48,7 +76,7 @@ const VideoPlayer = memo(
 
     const { orientation } = useScreenOrientation();
 
-    const [videoSrc, setVideoSrc] = useState<string>(src);
+    const [videoSrc, setVideoSrc] = useState<string>("");
     const [videoResolution, setVideoResolution] = useState<string>("720p");
 
     const [isPlayed, setIsPlayed] = useState(false);
@@ -66,6 +94,85 @@ const VideoPlayer = memo(
 
     const dimensions = useWindowDimensions();
 
+    // SYNC VIDEO
+    const lastSyncTime = useRef(0);
+    const isSyncing = useRef(false);
+
+    const syncToServer = useMutation({
+      mutationKey: ["syncToServer"],
+      mutationFn: async ({
+        episodeId,
+        lastTime,
+        videoDuration,
+      }: {
+        episodeId: string;
+        lastTime: number;
+        videoDuration: number;
+      }) =>
+        axiosIn
+          .post(
+            `${API_URL}/anime/user/history/sync`,
+            {
+              episodeId: episodeId,
+              lastTime: lastTime,
+              videoDuration: videoDuration,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          )
+          .then((res) => {
+            return res.data;
+          })
+          .catch((err) => {
+            console.error(err);
+            return err;
+          }),
+    });
+
+    const handleSyncOnPlaybackUpdate = (status: AVPlaybackStatus) => {
+      if (!status.isLoaded) return;
+
+      if (status.isPlaying && !isSyncing.current) {
+        syncToServer.mutate({
+          episodeId: episodeId,
+          lastTime: status.positionMillis / 1000,
+          videoDuration: status.durationMillis
+            ? status.durationMillis / 1000
+            : 0,
+        });
+        lastSyncTime.current = Date.now();
+        isSyncing.current = true;
+      } else if (status.isPlaying) {
+        // Throttle subsequent syncs
+        const currentTime = Date.now();
+        if (currentTime - lastSyncTime.current > 10000) {
+          // 10 seconds
+          syncToServer.mutate({
+            episodeId: episodeId,
+            lastTime: status.positionMillis / 1000,
+            videoDuration: status.durationMillis
+              ? status.durationMillis / 1000
+              : 0,
+          });
+          lastSyncTime.current = currentTime;
+        }
+      } else if (!status.isPlaying) {
+        // Stop syncing when video is paused
+        isSyncing.current = false;
+      }
+    };
+
+    useEffect(() => {
+      if (videoRef.current) {
+        videoRef.current.setOnPlaybackStatusUpdate(handleSyncOnPlaybackUpdate);
+      }
+    }, [videoRef.current]);
+
+    // END SYNC VIDEO
+
     useEffect(() => {
       const videoHeight = (videoSize.width / 16) * 9;
       const videoWidth = (videoSize.height / 9) * 16;
@@ -75,7 +182,6 @@ const VideoPlayer = memo(
 
       const top = layarKosongVertical < 0 ? 5 : layarKosongVertical / 2;
       const right = layarKosongHorizontal < 0 ? 5 : layarKosongHorizontal / 2;
-      console.log("aa", videoHeight, videoSize.height, layarKosongVertical);
 
       setOverlaySize({
         width: right,
@@ -119,7 +225,7 @@ const VideoPlayer = memo(
 
       const allSources = data.flatMap((server: any) => server.source);
       allSources.sort((a, b) => {
-        const qualityOrder = ["1080p", "720p", "480p", "360p", "4K"];
+        const qualityOrder = ["1080p", "720p", "480p", "360p", "240p", 'auto', "4K"];
         return (
           qualityOrder.indexOf(a.quality) - qualityOrder.indexOf(b.quality)
         );
@@ -155,15 +261,8 @@ const VideoPlayer = memo(
 
     const toggleFullscreen = async () => {
       if (!isFullscreen) {
-        // await ScreenOrientation.lockAsync(
-        //   ScreenOrientation.OrientationLock.LANDSCAPE
-        // );
         setIsFullscreen(true);
       } else {
-        // await ScreenOrientation.lockAsync(
-        //   ScreenOrientation.OrientationLock.PORTRAIT
-        // );
-
         if (
           orientation == ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
           orientation == ScreenOrientation.Orientation.LANDSCAPE_RIGHT
@@ -258,13 +357,10 @@ const VideoPlayer = memo(
       });
 
     const singleTap = Gesture.Tap().onStart((event) => {
-      console.log("Single Tap");
       runOnJS(showControlsWithTimeout)();
     });
 
     const overlayTap = Gesture.Tap().onStart(() => {
-      console.log("Overlay Tap");
-      // runOnJS(resetTimeout)();
       runOnJS(hideControls)();
     });
 
@@ -275,7 +371,6 @@ const VideoPlayer = memo(
     };
 
     const openBottomSheet = () => {
-      console.log("open bottom sheet");
       bottomSheetRef.current?.present();
     };
 
@@ -299,69 +394,303 @@ const VideoPlayer = memo(
       });
     };
 
-    return (
-      <>
-        <View
-          style={{
-            width: "100%",
-            position: "relative",
-            borderBottomWidth: 1,
-            borderBottomColor: colors.secondary,
-          }}
-        >
-          <GestureDetector gesture={Gesture.Exclusive(doubleTap, singleTap)}>
-            <Video
-              onLayout={onLayout}
-              ref={videoRef}
-              style={{
-                width: "100%",
-                ...(!isFullscreen && { aspectRatio: 16 / 9 }),
-                height: videoHeight,
-                backgroundColor: colors.black,
-              }}
-              source={{
-                uri: videoSrc,
-                headers: {
-                  "User-Agent":
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
-                },
-              }}
-              resizeMode={ResizeMode.CONTAIN}
-              onPlaybackStatusUpdate={(status) => {
-                if (status.isLoaded) {
-                  const buffering =
-                    (status.playableDurationMillis ?? 0) <=
-                    status.positionMillis;
+    if (data.length > 0 && data[0]?.source?.length > 0) {
+      return (
+        <>
+          <View
+            style={{
+              width: "100%",
+              position: "relative",
+              borderBottomWidth: 1,
+              borderBottomColor: colors.secondary,
+            }}
+          >
+            <GestureDetector gesture={Gesture.Exclusive(doubleTap, singleTap)}>
+              <Video
+                onLayout={onLayout}
+                ref={videoRef}
+                style={{
+                  width: "100%",
+                  ...(!isFullscreen && { aspectRatio: 16 / 9 }),
+                  height: videoHeight,
+                  backgroundColor: colors.black,
+                }}
+                source={{
+                  uri: videoSrc,
+                  headers: {
+                    "User-Agent":
+                      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+                  },
+                }}
+                resizeMode={ResizeMode.CONTAIN}
+                onPlaybackStatusUpdate={(status) => {
+                  if (status.isLoaded) {
+                    const buffering =
+                      (status.playableDurationMillis ?? 0) <=
+                      status.positionMillis;
 
-                  if (buffering) {
-                    setVideoStatus(VideoStatus.BUFFERING);
-                  } else {
-                    setVideoStatus(VideoStatus.READY);
+                    if (status.isPlaying) {
+                      KeepAwake.activateKeepAwakeAsync();
+                    } else {
+                      KeepAwake.deactivateKeepAwake();
+                    }
+
+                    if (buffering) {
+                      setVideoStatus(VideoStatus.BUFFERING);
+                    } else {
+                      setVideoStatus(VideoStatus.READY);
+                    }
+                  } else if (status.error) {
+                    setVideoStatus(VideoStatus.ERROR);
+                    console.error("Error", status.error);
                   }
-                } else if (status.error) {
-                  setVideoStatus(VideoStatus.ERROR);
-                  console.log("Error", status.error);
-                }
-              }}
-              onLoadStart={() => setVideoStatus(VideoStatus.LOADING)}
-              onReadyForDisplay={() => {
-                setVideoStatus(VideoStatus.READY);
-                runOnJS(playVideo)();
-              }}
-            />
-          </GestureDetector>
-          {showVideoControls && videoStatus == VideoStatus.READY && (
-            <GestureDetector gesture={overlayTap}>
+                }}
+                onLoadStart={() => setVideoStatus(VideoStatus.LOADING)}
+                onReadyForDisplay={() => {
+                  setVideoStatus(VideoStatus.READY);
+                  runOnJS(playVideo)();
+                }}
+              />
+            </GestureDetector>
+            {showVideoControls && videoStatus == VideoStatus.READY && (
+              <GestureDetector gesture={overlayTap}>
+                <View
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    backgroundColor: "rgba(0,0,0,0.5)",
+                    position: "absolute",
+                    justifyContent: "space-between",
+                    paddingTop: 10,
+                    paddingHorizontal: 10,
+                    zIndex: 10,
+                    paddingBottom:
+                      orientation ==
+                        ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+                      orientation ==
+                        ScreenOrientation.Orientation.LANDSCAPE_RIGHT
+                        ? 20
+                        : 0,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      alignItems: "center",
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        gap: 10,
+                        alignItems: "center",
+                      }}
+                    >
+                      <Feather name="chevron-down" size={16} color="white" />
+
+                      <CustomText color="white" size={14}>
+                        {title}
+                      </CustomText>
+                    </View>
+                  </View>
+
+                  {/* TENGAH */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 10,
+                      justifyContent: "space-around",
+                    }}
+                  >
+                    <GestureDetector gesture={Gesture.Tap().onEnd(() => {})}>
+                      <Feather name="skip-back" size={24} color="white" />
+                    </GestureDetector>
+                    <GestureDetector
+                      gesture={Gesture.Tap().onEnd(() =>
+                        runOnJS(playPauseVideo)()
+                      )}
+                    >
+                      {isPlayed ? (
+                        <Feather name="pause" size={24} color="white" />
+                      ) : (
+                        <Feather name="play" size={24} color="white" />
+                      )}
+                    </GestureDetector>
+                    <GestureDetector gesture={Gesture.Tap().onEnd(() => {})}>
+                      <Feather name="skip-forward" size={24} color="white" />
+                    </GestureDetector>
+                  </View>
+
+                  {/* Bawah */}
+                  <View style={{}}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          gap: 2,
+                        }}
+                      >
+                        <CustomText color="white" size={12}>
+                          {parseTime(progress)}
+                        </CustomText>
+                        <CustomText
+                          color="white"
+                          size={12}
+                          style={{ opacity: 0.5 }}
+                        >
+                          /
+                        </CustomText>
+                        <CustomText
+                          color="white"
+                          size={12}
+                          style={{ opacity: 0.5 }}
+                        >
+                          {parseTime(duration)}
+                        </CustomText>
+                      </View>
+
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <GestureDetector
+                          gesture={Gesture.Tap().onEnd(() =>
+                            runOnJS(openBottomSheet)()
+                          )}
+                        >
+                          <CustomText color="white" size={14}>
+                            {videoResolution}
+                          </CustomText>
+                        </GestureDetector>
+                        <TouchableOpacity
+                          onPress={() =>
+                            isPlayed ? pauseVideo() : playVideo()
+                          }
+                        >
+                          <CustomText color="white">1.5x</CustomText>
+                        </TouchableOpacity>
+                        <GestureDetector
+                          gesture={Gesture.Tap().onEnd(() =>
+                            runOnJS(toggleFullscreen)()
+                          )}
+                        >
+                          <MaterialIcons
+                            name={
+                              isFullscreen ? "fullscreen-exit" : "fullscreen"
+                            }
+                            size={24}
+                            color="white"
+                          />
+                        </GestureDetector>
+                      </View>
+                    </View>
+
+                    {/* Video Slider Time Control */}
+                    <Slider
+                      style={{ width: "100%" }}
+                      minimumValue={0}
+                      maximumValue={duration}
+                      value={progress}
+                      minimumTrackTintColor={colors.primary}
+                      maximumTrackTintColor={colors.gray[200]}
+                      thumbTintColor={colors.primary}
+                      onSlidingComplete={(value) => {
+                        videoRef.current?.setPositionAsync(value);
+                      }}
+                      onValueChange={(value) => {
+                        setProgress(value);
+                      }}
+                    />
+                    <View
+                      style={{
+                        display:
+                          orientation ==
+                            ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+                          orientation ==
+                            ScreenOrientation.Orientation.LANDSCAPE_RIGHT
+                            ? "flex"
+                            : "none",
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        marginTop: 10,
+                        paddingHorizontal: 16,
+                      }}
+                    >
+                      {isHavePrevEpisode ? (
+                        <GestureDetector
+                          gesture={Gesture.Tap().onEnd(() => {
+                            runOnJS(prevEpisode)();
+                          })}
+                        >
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: "row",
+                              gap: 5,
+                              alignItems: "center",
+                            }}
+                          >
+                            <Feather name="skip-back" size={16} color="white" />
+                            <CustomText>Previous Episode</CustomText>
+                          </TouchableOpacity>
+                        </GestureDetector>
+                      ) : (
+                        <View />
+                      )}
+
+                      {isHaveNextEpisode ? (
+                        <GestureDetector
+                          gesture={Gesture.Tap().onEnd(() => {
+                            runOnJS(nextEpisode)();
+                          })}
+                        >
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: "row",
+                              gap: 5,
+                              alignItems: "center",
+                            }}
+                          >
+                            <CustomText>Next Episode</CustomText>
+                            <Feather
+                              name="skip-forward"
+                              size={16}
+                              color="white"
+                            />
+                          </TouchableOpacity>
+                        </GestureDetector>
+                      ) : (
+                        <View />
+                      )}
+                    </View>
+                  </View>
+                </View>
+              </GestureDetector>
+            )}
+
+            {videoStatus == VideoStatus.LOADING && (
               <View
                 style={{
                   width: "100%",
                   height: "100%",
                   backgroundColor: "rgba(0,0,0,0.5)",
                   position: "absolute",
-                  justifyContent: "space-between",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  zIndex: 10,
                   paddingTop: 10,
                   paddingHorizontal: 10,
-                  zIndex: 10,
                   paddingBottom:
                     orientation ==
                       ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
@@ -370,321 +699,168 @@ const VideoPlayer = memo(
                       : 0,
                 }}
               >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    alignItems: "center",
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      gap: 10,
-                      alignItems: "center",
-                    }}
-                  >
-                    <Feather name="chevron-down" size={16} color="white" />
-
-                    <CustomText color="white" size={14}>
-                      {title}
-                    </CustomText>
-                  </View>
-                </View>
-
-                {/* TENGAH */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    gap: 10,
-                    justifyContent: "space-around",
-                  }}
-                >
-                  <GestureDetector gesture={Gesture.Tap().onEnd(() => {})}>
-                    <Feather name="skip-back" size={24} color="white" />
-                  </GestureDetector>
-                  <GestureDetector
-                    gesture={Gesture.Tap().onEnd(() =>
-                      runOnJS(playPauseVideo)()
-                    )}
-                  >
-                    {isPlayed ? (
-                      <Feather name="pause" size={24} color="white" />
-                    ) : (
-                      <Feather name="play" size={24} color="white" />
-                    )}
-                  </GestureDetector>
-                  <GestureDetector gesture={Gesture.Tap().onEnd(() => {})}>
-                    <Feather name="skip-forward" size={24} color="white" />
-                  </GestureDetector>
-                </View>
-
-                {/* Bawah */}
-                <View style={{}}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        gap: 2,
-                      }}
-                    >
-                      <CustomText color="white" size={12}>
-                        {parseTime(progress)}
-                      </CustomText>
-                      <CustomText
-                        color="white"
-                        size={12}
-                        style={{ opacity: 0.5 }}
-                      >
-                        /
-                      </CustomText>
-                      <CustomText
-                        color="white"
-                        size={12}
-                        style={{ opacity: 0.5 }}
-                      >
-                        {parseTime(duration)}
-                      </CustomText>
-                    </View>
-
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 10,
-                      }}
-                    >
-                      <GestureDetector
-                        gesture={Gesture.Tap().onEnd(() =>
-                          runOnJS(openBottomSheet)()
-                        )}
-                      >
-                        <CustomText color="white">{videoResolution}</CustomText>
-                      </GestureDetector>
-                      <Pressable
-                        onPress={() => (isPlayed ? pauseVideo() : playVideo())}
-                      >
-                        <CustomText color="white">1.5x</CustomText>
-                      </Pressable>
-                      <GestureDetector
-                        gesture={Gesture.Tap().onEnd(() =>
-                          runOnJS(toggleFullscreen)()
-                        )}
-                      >
-                        <MaterialIcons
-                          name={isFullscreen ? "fullscreen-exit" : "fullscreen"}
-                          size={24}
-                          color="white"
-                        />
-                      </GestureDetector>
-                    </View>
-                  </View>
-
-                  {/* Video Slider Time Control */}
-                  <Slider
-                    style={{ width: "100%" }}
-                    minimumValue={0}
-                    maximumValue={duration}
-                    value={progress}
-                    minimumTrackTintColor={colors.primary}
-                    maximumTrackTintColor={colors.gray[200]}
-                    thumbTintColor={colors.primary}
-                    onSlidingComplete={(value) => {
-                      videoRef.current?.setPositionAsync(value);
-                    }}
-                    onValueChange={(value) => {
-                      setProgress(value);
-                    }}
-                  />
-                </View>
+                <CustomText color="white">Loading...</CustomText>
               </View>
-            </GestureDetector>
-          )}
+            )}
 
-          {videoStatus == VideoStatus.LOADING && (
-            <View
-              style={{
-                width: "100%",
-                height: "100%",
-                backgroundColor: "rgba(0,0,0,0.5)",
-                position: "absolute",
-                justifyContent: "center",
-                alignItems: "center",
-                zIndex: 10,
-                paddingTop: 10,
-                paddingHorizontal: 10,
-                paddingBottom:
-                  orientation == ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
-                  orientation == ScreenOrientation.Orientation.LANDSCAPE_RIGHT
-                    ? 20
-                    : 0,
-              }}
-            >
-              <CustomText color="white">Loading...</CustomText>
-            </View>
-          )}
-
-          {videoStatus == VideoStatus.BUFFERING && (
-            <View
-              style={{
-                width: "100%",
-                height: "100%",
-                backgroundColor: "rgba(0,0,0,0.5)",
-                position: "absolute",
-                justifyContent: "center",
-                alignItems: "center",
-                zIndex: 10,
-                paddingTop: 10,
-                paddingHorizontal: 10,
-                paddingBottom:
-                  orientation == ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
-                  orientation == ScreenOrientation.Orientation.LANDSCAPE_RIGHT
-                    ? 20
-                    : 0,
-              }}
-            >
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          )}
-
-          {videoStatus == VideoStatus.ERROR && (
-            <View
-              style={{
-                width: "100%",
-                height: "100%",
-                backgroundColor: "rgba(0,0,0,0.8)",
-                position: "absolute",
-                justifyContent: "center",
-                alignItems: "center",
-                zIndex: 10,
-                paddingTop: 10,
-                paddingHorizontal: 10,
-                paddingBottom:
-                  orientation == ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
-                  orientation == ScreenOrientation.Orientation.LANDSCAPE_RIGHT
-                    ? 20
-                    : 0,
-              }}
-            >
-              <CustomText color="white">Error</CustomText>
-              <TouchableWithoutFeedback
-                onPress={() => openBottomSheet()}
-                style={{
-                  marginTop: 10,
-                  paddingHorizontal: 16,
-                  paddingVertical: 5,
-                  borderRadius: 10,
-                  backgroundColor: colors.muted,
-                }}
-              >
-                <CustomText color="white">Change Resolution</CustomText>
-              </TouchableWithoutFeedback>
-            </View>
-          )}
-
-          {/* WM VIDEO */}
-          {videoStatus != VideoStatus.ERROR && (
-            <View
-              style={{
-                position: "absolute",
-                top: overlaySize.height,
-                right: overlaySize.width,
-                width: "10%",
-                height: 20,
-
-                // backgroundColor: colors.primary,
-                zIndex: 1,
-              }}
-            >
-              <Image
-                source={require("./../assets/images/video-watermark.png")}
+            {videoStatus == VideoStatus.BUFFERING && (
+              <View
                 style={{
                   width: "100%",
                   height: "100%",
-                  opacity: 0.5,
+                  backgroundColor: "rgba(0,0,0,0.5)",
+                  position: "absolute",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  zIndex: 10,
+                  paddingTop: 10,
+                  paddingHorizontal: 10,
+                  paddingBottom:
+                    orientation ==
+                      ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+                    orientation == ScreenOrientation.Orientation.LANDSCAPE_RIGHT
+                      ? 20
+                      : 0,
                 }}
-                contentFit="contain"
-              />
-            </View>
-          )}
-        </View>
-        <BottomSheetModal
-          ref={bottomSheetRef}
-          index={1}
-          snapPoints={snapPoints}
-          backgroundStyle={{
-            backgroundColor: colors.background,
-            borderColor: colors.muted,
-            borderTopWidth: 1.5,
-            borderTopLeftRadius: 10,
-            borderTopRightRadius: 10,
-          }}
-          handleIndicatorStyle={{ backgroundColor: colors.white }}
-          backdropComponent={renderBackdrop}
-        >
-          <BottomSheetView
-            style={{
-              flex: 1,
-              padding: 16,
-              backgroundColor: colors.background,
-            }}
-          >
-            <CustomText
-              fontStyle="medium"
-              size={20}
-              style={{ textAlign: "center", marginBottom: 20 }}
-            >
-              Resolution
-            </CustomText>
+              >
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            )}
 
-            {data?.map((item: any, index) => (
-              <Fragment key={item.name}>
-                <CustomText size={14} fontStyle="medium">
-                  Server {index + 1}
-                </CustomText>
-                <View
+            {videoStatus == VideoStatus.ERROR && (
+              <View
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: "rgba(0,0,0,0.8)",
+                  position: "absolute",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  zIndex: 10,
+                  paddingTop: 10,
+                  paddingHorizontal: 10,
+                  paddingBottom:
+                    orientation ==
+                      ScreenOrientation.Orientation.LANDSCAPE_LEFT ||
+                    orientation == ScreenOrientation.Orientation.LANDSCAPE_RIGHT
+                      ? 20
+                      : 0,
+                }}
+              >
+                <CustomText color="white">Error</CustomText>
+                <TouchableOpacity
+                  onPress={() => openBottomSheet()}
                   style={{
-                    flexDirection: "row",
-                    gap: 10,
-                    marginTop: 6,
-                    flexWrap: "wrap",
-                    marginBottom: 10,
+                    marginTop: 10,
+                    paddingHorizontal: 16,
+                    paddingVertical: 5,
+                    borderRadius: 10,
+                    backgroundColor: colors.muted,
                   }}
                 >
-                  {item?.source?.map((source: any, index: number) => (
-                    <TouchableWithoutFeedback
-                      onPress={() =>
-                        changeResolution(source.url, source.quality)
-                      }
-                      key={source.id}
-                      style={{
-                        backgroundColor:
-                          source.url === videoSrc
-                            ? colors.primary
-                            : colors.muted,
-                        paddingHorizontal: 16,
-                        paddingVertical: 5,
-                        borderRadius: 10,
-                      }}
-                    >
-                      <CustomText size={12}>{source.quality}</CustomText>
-                    </TouchableWithoutFeedback>
-                  ))}
-                </View>
-              </Fragment>
-            ))}
-          </BottomSheetView>
-        </BottomSheetModal>
-      </>
-    );
+                  <CustomText color="white">Change Resolution</CustomText>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* WM VIDEO */}
+            {videoStatus != VideoStatus.ERROR && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: overlaySize.height,
+                  right: overlaySize.width,
+                  width: "10%",
+                  height: 20,
+
+                  // backgroundColor: colors.primary,
+                  zIndex: 1,
+                }}
+              >
+                <Image
+                  source={require("./../assets/images/video-watermark.png")}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    opacity: 0.8,
+                  }}
+                  contentFit="contain"
+                />
+              </View>
+            )}
+          </View>
+          <BottomSheetModal
+            ref={bottomSheetRef}
+            index={1}
+            snapPoints={snapPoints}
+            backgroundStyle={{
+              backgroundColor: colors.background,
+              borderColor: colors.muted,
+              borderTopWidth: 1.5,
+              borderTopLeftRadius: 10,
+              borderTopRightRadius: 10,
+            }}
+            handleIndicatorStyle={{ backgroundColor: colors.white }}
+            backdropComponent={renderBackdrop}
+          >
+            <BottomSheetView
+              style={{
+                flex: 1,
+                padding: 16,
+                backgroundColor: colors.background,
+              }}
+            >
+              <CustomText
+                fontStyle="medium"
+                size={20}
+                style={{ textAlign: "center", marginBottom: 20 }}
+              >
+                Resolution
+              </CustomText>
+
+              {data?.map((item: any, index) => (
+                <Fragment key={item.name}>
+                  <CustomText size={14} fontStyle="medium">
+                    Server {index + 1}
+                  </CustomText>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      gap: 10,
+                      marginTop: 6,
+                      flexWrap: "wrap",
+                      marginBottom: 10,
+                    }}
+                  >
+                    {item?.source?.map((source: any, index: number) => (
+                      <TouchableOpacity
+                        onPress={() =>
+                          changeResolution(source.url, source.quality)
+                        }
+                        key={source.id}
+                        style={{
+                          backgroundColor:
+                            source.url === videoSrc
+                              ? colors.primary
+                              : colors.muted,
+                          paddingHorizontal: 16,
+                          paddingVertical: 5,
+                          borderRadius: 10,
+                        }}
+                      >
+                        <CustomText size={12}>{source.quality}</CustomText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </Fragment>
+              ))}
+            </BottomSheetView>
+          </BottomSheetModal>
+        </>
+      );
+    }
+
+    return <StreamUrlNotFound />;
   }
 );
 

@@ -1,5 +1,4 @@
 import { SafeAreaView } from "react-native-safe-area-context";
-// import GlobalLoading from "./GlobalLoading";
 import {
   ScrollView,
   ScrollViewProps,
@@ -8,9 +7,7 @@ import {
   ViewProps,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { BaseColors, ThemeColors } from "@/constants/Colors";
-import Animated from "react-native-reanimated";
-// import ToastManager from "toastify-react-native";
+import { ThemeColors } from "@/constants/Colors";
 
 interface SafeAreaWrapperProps extends ScrollViewProps {
   children?: React.ReactNode;
@@ -25,8 +22,6 @@ export default function SafeAreaWrapper(props: SafeAreaWrapperProps) {
 
   return (
     <SafeAreaView style={styles.safeAreaView}>
-      {/* <GlobalLoading />
-      <ToastManager position="top" /> */}
       {props.header && (
         <View
           style={[
@@ -39,7 +34,10 @@ export default function SafeAreaWrapper(props: SafeAreaWrapperProps) {
           {props.header}
         </View>
       )}
-      <ScrollView contentContainerStyle={[styles.scrollView, props.style]}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollView, props.contentContainerStyle]}
+        {...props} // Menggunakan spread operator untuk meneruskan semua props ke ScrollView
+      >
         {props.children}
       </ScrollView>
     </SafeAreaView>

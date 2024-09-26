@@ -1,13 +1,24 @@
 import { Tabs } from "expo-router";
 import React from "react";
-
-import { Colors } from "@/constants/Colors";
 import { useColors } from "@/hooks/useColors";
-import { AntDesign, Feather } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
+import { useAtom } from "jotai";
+import { userAtom } from "@/store/auth";
+import LoadingPage from "@/components/LoadingPage";
+import ErrorPage from "@/components/ErrorPage";
 
 export default function TabLayout() {
   const colors = useColors();
 
+  const [user, setUser] = useAtom(userAtom);
+
+  if (user.isLoading) {
+    return <LoadingPage />;
+  }
+
+  if (user.error) {
+    return <ErrorPage message={user?.error?.message} />;
+  }
   return (
     <Tabs
       screenOptions={{
@@ -16,6 +27,8 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.border,
+          height: 60,
+          paddingTop: 8,
         },
       }}
     >
@@ -29,6 +42,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="schedule"
+        options={{
+          title: "Schedule",
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="calendar" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="all-anime"
         options={{
           title: "All",
@@ -37,12 +59,13 @@ export default function TabLayout() {
           ),
         }}
       />
+
       <Tabs.Screen
-        name="schedule"
+        name="bookmark"
         options={{
-          title: "Schedule",
+          title: "Bookmark",
           tabBarIcon: ({ color, focused }) => (
-            <Feather name="calendar" size={24} color={color} />
+            <Feather name="bookmark" size={24} color={color} />
           ),
         }}
       />
